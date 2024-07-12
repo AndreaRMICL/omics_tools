@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omics_tools"
+version = "0.0.1"
+authors = [
+  { name="Andrea Rodriguez Martinez"},
+]
+description = "A toolbox for omics analyses."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    'fisher',
+    'joblib',
+    'numba',
+    'statsmodels',
+    'numpy',
+    'pandas',
+    'statsmodels',
+]
+
+[project.optional-dependencies]
+dev = ['nox[uv]']
+tests = ['coverage[toml]', 'pytest']
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.coverage.paths]
+source = ['src/', '.cache/nox/*/lib/*/site-packages/']
+
+[tool.coverage.run]
+branch = true
+
+[tool.mypy]
+cache_dir = ".cache/mypy_cache"
+files = ['src/', 'tests/']
+show_error_codes = true
+# --strict mode enables the following flags:
+warn_unused_configs = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+extra_checks = true
+
+[[tool.mypy.overrides]]
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
+module = 'tests.*'
+
+[tool.ruff]
+cache-dir = ".cache/ruff"
+line-length = 88
+src = ["src", "tests"]
+include = ["src/**/*.py", "tests/**/*.py", "noxfile.py", "pyproject.toml"]
+show-fixes = true
+target-version = "py310"  # the minimum python version that should be supported
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # recommended lint rules to ignore for compatibility with ruff formatter
+    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "W191", "E111", "E114", "E117", "D206", "D300", "Q000", "Q001", "Q002", "Q003", "COM812", "COM819", "ISC001", "ISC002",
+    "E501",
+    # intentionally ignored:
+    "D", # pydocstyle
+    "FIX002",  # line-contains-TD
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "ANN001",  # missing-type-function-argument: allow for test functions to avoid having to annotate fixtures
+    "ANN201",  # missing-return-type-undocumented-public-function: reduce boilerplate in tests
+    "S101",  # assert: allow using assert statements in tests
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+addopts = ["-rv", "--strict-markers", "--strict-config", "--doctest-modules", "--color=yes"]
+cache_dir = ".cache/pytest_cache"
+testpaths = [
+    # 'src',
+    'tests'
+]
+xfail_strict = true
+# filterwarnings = ["error"]
