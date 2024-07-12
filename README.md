@@ -2,7 +2,7 @@
 
 A collection of tools to extract meaningful insights from omics datasets.
 
-# Installation
+## Installation
 
 To install the `omics_tools` package, follow these steps:
 
@@ -21,7 +21,7 @@ To install the `omics_tools` package, follow these steps:
     pip install .
     ```
 
-# Tutorials
+## Tutorials
 
 We provide a few notebooks illustrating some of `omics_tools` functionalities:
 * [Differential expression analysis](notebooks/differential_expression.ipynb)
