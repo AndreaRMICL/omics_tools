@@ -8,7 +8,7 @@ To install the `omics_tools` package, follow these steps:
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/omics_tools.git
+    git clone https://github.com/AndreaRMICL/omics_tools.git
     ```
 
 2. Navigate to the repository directory:
