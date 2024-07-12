@@ -31,6 +31,6 @@ We provide a few notebooks illustrating some of `omics_tools` functionalities:
 > [!NOTE]
 >
 > Before navigating through the tutorials, make sure you download all the required
-> datasets. All datasets can be [here](https://github.com/AndreaRMICL/datasets/transcriptomics)
+> datasets. All datasets can be [here](https://github.com/AndreaRMICL/datasets/tree/main/transcriptomics)
 
 
