@@ -13,7 +13,7 @@ def fisher(
         query: A set of query items.
         annotation_mapper: A dictionary where keys are annotation IDs
             and values are sets of items annotated with that ID.
-        space_size: The size of the space from which the query and annotations are drawn.
+        space_size: The size of the space from which the query is drawn.
 
     Returns:
         A DataFrame containing the results of the enrichment analysis, with columns:
