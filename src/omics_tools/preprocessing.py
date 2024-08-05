@@ -76,6 +76,9 @@ def quantile_transformation(data: pd.DataFrame, **kwargs) -> pd.DataFrame:
         >>> print(transformed_data)
     """
     return pd.DataFrame(
-        {col: quantile_transform(data[col].values.reshape(-1, 1), **kwargs).flatten() for col in data.columns},
-        index=data.index
+        {
+            col: quantile_transform(data[col].values.reshape(-1, 1), **kwargs).flatten()
+            for col in data.columns
+        },
+        index=data.index,
     )

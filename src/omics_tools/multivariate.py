@@ -3,17 +3,8 @@ from typing import Any, NamedTuple
 import numpy as np
 import pandas as pd
 from sklearn.cross_decomposition import PLSRegression
-from sklearn.decomposition import PCA, FastICA
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    mean_absolute_error,
-    mean_squared_error,
-    precision_score,
-    r2_score,
-    recall_score,
-)
-from sklearn.model_selection import cross_val_predict
+from sklearn.decomposition import NMF, PCA, FastICA
+from sklearn.metrics import r2_score
 from sklearn.preprocessing import StandardScaler
 
 
@@ -126,6 +117,60 @@ def pca(
     )
 
 
+def nmf(
+    data: pd.DataFrame,
+    n_components: int,
+    random_state: int = 0,
+    **kwargs: Any,
+) -> LvmResults:
+    """Performs non-negative matrix factorisation (NMF).
+
+    Before applying NMF, missing values in the data are replaced with
+    the average of the corresponding feature.
+
+    Args:
+        data: The input data.
+        n_components : The number of principal components.
+        random_state: The random seed for reproducibility.
+        **kwargs: Additional parameters to pass to the `PCA` function from sklearn.
+
+    Returns:
+        A NamedTuple containing the following elements:
+        - feature_weights: The weights of each feature in each component.
+        - sample_weights: The weights of each sample for each component.
+        - model: The fitted  model object from sklearn.
+
+    Examples:
+        >>> import pandas as pd
+        >>> from sklearn.datasets import load_iris
+        >>> from omics_tools.multivariate import nmf
+        >>> data = pd.DataFrame(load_iris().data, columns=load_iris().feature_names)
+        >>> result = nmf(data, n_components=2, scale=True)
+        >>> print(result.feature_weights.head())
+    """
+
+    # Make a copy of the original data
+    data_original = data.copy(deep=True)
+
+    # Process data
+    data = data.fillna(data.mean())
+
+    # Run model
+    nmf_model = NMF(n_components=n_components, random_state=random_state, **kwargs)
+    sample_weights = nmf_model.fit_transform(data)
+    feature_weights = nmf_model.components_
+
+    return _process_lvm_output(
+        data=data_original,
+        component_names=[
+            f"{n_components}_{random_state}_{index}" for index in range(n_components)
+        ],
+        sample_weights=sample_weights,
+        feature_weights=feature_weights,
+        model=nmf_model,
+    )
+
+
 def ica(
     data: pd.DataFrame,
     n_components: int,
@@ -189,80 +234,6 @@ def ica(
         sample_weights=sample_weights,
         feature_weights=feature_weights,
         model=ica_model,
-    )
-
-
-def ica_reproducibility(
-    data: pd.DataFrame, n_components: int, n_random_states: int = 10, **kwargs
-) -> pd.DataFrame:
-    """Evaluates the reproducibility of Independent Component Analysis (ICA).
-
-    Runs ICA multiple times with different random states, keeping all
-    other parameters constant. It then calculates the maximum correlation
-    between each of the components of given run and all other components of
-    another run.
-
-    Args:
-        data: The input data to perform ICA on.
-        n_components: The number of components to decompose the data into.
-        n_random_states: The number of different random states to use for ICA.
-        **kwargs: Additional keyword arguments to pass to the ica function.
-
-    Returns:
-        A DataFrame containing the following columns:
-        - n_components: the number of ICA components.
-        - component_a: the component of run `a`.
-        - random_state_a: the random state of run `a`.
-        - random_state_b: the random state of of run `b`.
-        - r2_max: the maximum correlation of `component_a` across all components of run `b`.
-
-    Example:
-        >>> import pandas as pd
-        >>> from sklearn.datasets import load_iris
-        >>> from omics_tools.multivariate import ica_reproducibility
-        >>> data = pd.DataFrame(load_iris().data)
-        >>> result = ica_reproducibility(data, n_components=3, n_random_states=5)
-        >>> print(result.head())
-    """
-
-    results = pd.concat(
-        [
-            ica(
-                data=data,
-                n_components=n_components,
-                random_state=random_state,
-                **kwargs,
-            ).feature_weights
-            for random_state in range(n_random_states)
-        ]
-    )
-
-    corr_components = pd.DataFrame(
-        results.T.corr(method="spearman"), columns=results.index, index=results.index
-    ).abs()
-    corr_components = (
-        corr_components.reset_index()
-        .melt(id_vars="index", var_name="component_b", value_name="r2")
-        .rename(columns={"index": "component_a"})
-    )
-    corr_components[["n_components", "random_state_a", "component_a"]] = (
-        corr_components["component_a"].str.split("_", expand=True).astype(int)
-    )
-    corr_components[["n_components", "random_state_b", "component_b"]] = (
-        corr_components["component_b"].str.split("_", expand=True).astype(int)
-    )
-    corr_components = corr_components[
-        corr_components["random_state_a"] != corr_components["random_state_b"]
-    ]
-
-    return (
-        corr_components.groupby(
-            ["n_components", "component_a", "random_state_a", "random_state_b"]
-        )["r2"]
-        .max()
-        .to_frame()
-        .reset_index()
-        .rename(columns={"r2": "r2_max"})
     )
 
 
@@ -343,160 +314,4 @@ def pls(
             pls_model, dependent_variable
         ),
         model=pls_model,
-    )
-
-
-def cv_regression(
-    model: Any,
-    independent_variables: pd.DataFrame,
-    dependent_variable: pd.Series,
-    **kwargs: Any,
-) -> pd.DataFrame:
-    """Performs k-fold cross-validation (CV) on a regression model.
-
-    Performns CV on a regression model and derives relevant model
-    performance metrics (coefficient of determination, mean squared arror,
-    mean absolute error).
-
-    Args:
-        model: The regression model to be evaluated.
-        independent_variables: The independent variables.
-        dependent_variable: The dependent variable (continuous).
-        **kwargs: Additional parameters to pass to the `cross_val_predict` function from sklearn.
-
-    Returns:
-        A DataFrame with the following columns:
-        - 'r2_scored': The coefficient of determination.
-        - 'mse': The mean squared error.
-        - 'mae': The mean absolute error.
-
-    Example:
-    >>> import pandas as pd
-    >>> from sklearn.cross_decomposition import PLSRegression
-    >>> from sklearn.datasets import load_diabetes
-    >>> from omics_tools.multivariate import cv_regression
-    >>> diabetes = load_diabetes()
-    >>> independent_variables = pd.DataFrame(diabetes.data, columns=diabetes.feature_names)
-    >>> dependent_variable = pd.Series(diabetes.target)
-    >>> result = cv_regression(PLSRegression(n_components=3), independent_variables, dependent_variable)
-    >>> print(result)
-    """
-
-    # Process data
-    not_null_mask = ~dependent_variable.isnull()
-    dependent_variable = dependent_variable[not_null_mask]
-    independent_variables = independent_variables[not_null_mask]
-    independent_variables = independent_variables.fillna(independent_variables.mean())
-
-    # Generate cross-validated predictions for each input data point
-    dependent_variable_pred = cross_val_predict(
-        estimator=model, X=independent_variables, y=dependent_variable, **kwargs
-    )
-
-    # Calculate metrics
-    return pd.DataFrame(
-        {
-            "r2_score": [
-                r2_score(y_true=dependent_variable, y_pred=dependent_variable_pred)
-            ],
-            "mse": [
-                mean_squared_error(
-                    y_true=dependent_variable, y_pred=dependent_variable_pred
-                )
-            ],
-            "mae": [
-                mean_absolute_error(
-                    y_true=dependent_variable, y_pred=dependent_variable_pred
-                )
-            ],
-        }
-    )
-
-
-def cv_classification(
-    model: Any,
-    independent_variables: pd.DataFrame,
-    dependent_variable: pd.Series,
-    round_predictions: bool = False,
-    average: str = "binary",
-    **kwargs: Any,
-) -> pd.DataFrame:
-    """Performs k-fold cross-validation (CV) on a classification model.
-
-    Performs CV on a classification model and derives relevant model
-    performance metrics (accuracy, precision, recall, F1-score).
-
-    Args:
-        model: The classification model to be evaluated.
-        independent_variables: The independent variables.
-        dependent_variable: The dependent variable.
-        round_predictions: Whether to round up predictions to nearest integer.
-        average: The averaging strategy for metrics when the dependent variable has
-            more than 2 different labels. Options: ‘micro’, ‘macro’, ‘samples’, ‘weighted’,
-            ‘binary’ or None. For details see the `precision_score` function from sklearn.
-        **kwargs: Additional parameters to pass to the `cross_val_predict` function from sklearn.
-
-    Returns:
-        pd.DataFrame: A DataFrame with the following columns:
-          - 'accuracy': The accuracy of the model.
-          - 'precision': The precision of the model.
-          - 'recall': The recall of the model.
-          - 'f1_score': The F1-score of the model.
-
-    Example:
-    >>> import pandas as pd
-    >>> from sklearn.linear_model import LogisticRegression
-    >>> from sklearn.datasets import load_breast_cancer
-    >>> from omics_tools.multivariate import cv_classification
-    >>> cancer = load_breast_cancer()
-    >>> independent_variables = pd.DataFrame(cancer.data, columns=cancer.feature_names)
-    >>> dependent_variable = pd.Series(cancer.target)
-    >>> result = cv_classification(LogisticRegression(max_iter=1000), independent_variables, dependent_variable)
-    >>> print(result)
-    """
-
-    # Process data
-    not_null_mask = ~dependent_variable.isnull()
-    dependent_variable = dependent_variable[not_null_mask]
-    independent_variables = independent_variables[not_null_mask]
-    independent_variables = independent_variables.fillna(independent_variables.mean())
-
-    # Generate cross-validated predictions for each input data point
-    dependent_variable_pred = cross_val_predict(
-        estimator=model, X=independent_variables, y=dependent_variable, **kwargs
-    )
-
-    # Optionally round up predictions
-    if round_predictions:
-        dependent_variable_pred = dependent_variable_pred.round()
-
-    return pd.DataFrame(
-        {
-            "accuracy": [
-                accuracy_score(
-                    y_true=dependent_variable, y_pred=dependent_variable_pred
-                )
-            ],
-            "precision": [
-                precision_score(
-                    y_true=dependent_variable,
-                    y_pred=dependent_variable_pred,
-                    average=average,
-                )
-            ],
-            "recall": [
-                recall_score(
-                    y_true=dependent_variable,
-                    y_pred=dependent_variable_pred,
-                    average=average,
-                )
-            ],
-            "f1_score": [
-                f1_score(
-                    y_true=dependent_variable,
-                    y_pred=dependent_variable_pred,
-                    average=average,
-                )
-            ],
-        }
     )

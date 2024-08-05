@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from scipy.stats import linregress, mannwhitneyu, spearmanr, ttest_ind
+from scipy.stats import linregress, mannwhitneyu, ttest_ind
 
 from omics_tools import association
 

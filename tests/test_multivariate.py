@@ -32,21 +32,6 @@ def test_ica(fixture_dataset):
     assert set(ica_results.sample_weights.index) == set(data.index)
 
 
-def test_ica_reproducibility(fixture_dataset):
-    data = fixture_dataset[0]
-
-    n_components = 4
-    n_random_states = 6
-    results = multivariate.ica_reproducibility(
-        data, n_components=n_components, n_random_states=n_random_states
-    )
-
-    expected_length = (n_components * (n_random_states - 1)) * n_random_states
-    observed_length = len(results)
-
-    assert expected_length == observed_length
-
-
 def test_pls(fixture_dataset):
     data = fixture_dataset[0]
     dependent_variable = fixture_dataset[1]
